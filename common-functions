@@ -254,6 +254,36 @@ service_logs() {
   docker logs $DOKKU_LOGS_ARGS "$ID"
 }
 
+service_port_pause() {
+  declare desc="Pauses service exposure"
+  declare SERVICE="$1" LOG_FAIL="$2"
+  local SERVICE_ROOT="$PLUGIN_DATA_ROOT/$SERVICE"
+  local EXPOSED_NAME="$(get_service_name "$SERVICE").ambassador"
+  local PORT_FILE="$SERVICE_ROOT/PORT"
+
+  if [[ "$LOG_FAIL" == "true" ]]; then
+    [[ ! -f "$PORT_FILE" ]] && dokku_log_fail "Service not exposed"
+  else
+    [[ ! -f "$PORT_FILE" ]] && return 0
+  fi
+
+  local GREP_NAME="^/${EXPOSED_NAME}$"
+  local CONTAINER_NAME="$(docker ps -f name="$GREP_NAME" --format "{{.Names}}")"
+  if [[ -z "$CONTAINER_NAME" ]]; then
+    if [[ "$LOG_FAIL" == "true" ]]; then
+      dokku_log_info1 "Service $SERVICE unexposed"
+    fi
+
+    return
+  fi
+
+  docker stop "$EXPOSED_NAME" >/dev/null 2>&1 || true
+  docker rm "$EXPOSED_NAME" >/dev/null 2>&1 || true
+  if [[ "$LOG_FAIL" == "true" ]]; then
+    dokku_log_info1 "Service $SERVICE unexposed"
+  fi
+}
+
 service_parse_args() {
   declare desc="cli arg parser"
   local next_index=1; local skip=false; local args=("$@")
